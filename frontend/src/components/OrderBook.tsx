@@ -9,7 +9,6 @@ export const OrderBook: React.FC<OrderBookProps> = ({ data }) => {
   // 安全检查：确保 data 及其属性存在
   const bids = data?.bids ?? [];
   const asks = data?.asks ?? [];
-  const hasData = bids.length > 0 && asks.length > 0;
 
   // 计算委比：(委买量 - 委卖量) / (委买量 + 委卖量) * 100%
   const totalBidSize = bids.reduce((sum, b) => sum + b.size, 0);
