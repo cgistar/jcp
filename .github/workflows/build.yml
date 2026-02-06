@@ -18,18 +18,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build:
-          - name: 'jcp'
-            platform: 'linux/amd64'
-            os: 'ubuntu-latest'
-          - name: 'jcp'
-            platform: 'windows/amd64'
-            os: 'windows-latest'
-          - name: 'jcp'
-            platform: 'darwin/universal'
-            os: 'macos-latest'
+        include:
+          - platform: linux/amd64
+            os: ubuntu-latest
+            output: jcp
+            archive: jcp-linux-amd64.tar.gz
+          - platform: windows/amd64
+            os: windows-latest
+            output: jcp.exe
+            archive: jcp-windows-amd64.zip
+          - platform: darwin/universal
+            os: macos-latest
+            output: jcp.app
+            archive: jcp-macos-universal.zip
 
-    runs-on: ${{ matrix.build.os }}
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -37,40 +40,50 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build Wails App
-        uses: dAppServer/wails-build-action@v2.2
-        id: build
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          build-name: ${{ matrix.build.name }}
-          build-platform: ${{ matrix.build.platform }}
-          package: false
           go-version: '1.24'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
           node-version: '20'
 
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build
+        run: wails build -platform ${{ matrix.platform }}
+
       - name: Package (Linux)
-        if: matrix.build.os == 'ubuntu-latest'
+        if: runner.os == 'Linux'
         run: |
           cd build/bin
-          tar -czvf jcp-linux-amd64.tar.gz jcp
+          tar -czvf ${{ matrix.archive }} ${{ matrix.output }}
 
       - name: Package (Windows)
-        if: matrix.build.os == 'windows-latest'
+        if: runner.os == 'Windows'
         run: |
-          Compress-Archive -Path build/bin/jcp.exe -DestinationPath build/bin/jcp-windows-amd64.zip
+          Compress-Archive -Path build/bin/${{ matrix.output }} -DestinationPath build/bin/${{ matrix.archive }}
 
       - name: Package (macOS)
-        if: matrix.build.os == 'macos-latest'
+        if: runner.os == 'macOS'
         run: |
           cd build/bin
-          zip -r jcp-macos-universal.zip jcp.app
+          zip -r ${{ matrix.archive }} ${{ matrix.output }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jcp-${{ matrix.build.os }}
-          path: |
-            build/bin/*.tar.gz
-            build/bin/*.zip
+          name: ${{ matrix.archive }}
+          path: build/bin/${{ matrix.archive }}
 
   release:
     needs: build
@@ -87,6 +100,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: |
-            artifacts/**/*.tar.gz
-            artifacts/**/*.zip
+          files: artifacts/**/*
