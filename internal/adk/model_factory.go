@@ -2,9 +2,12 @@ package adk
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/auth"
 	"cloud.google.com/go/auth/credentials"
@@ -150,4 +153,101 @@ func (f *ModelFactory) createOpenAIResponsesModel(config *models.AIConfig) (mode
 		Transport: proxy.GetManager().GetTransport(),
 	}
 	return openai.NewResponsesModel(config.ModelName, config.APIKey, baseURL, httpClient), nil
+}
+
+// TestConnection 测试 AI 配置的连通性
+// 通过发送一个最小请求来验证 API Key、Base URL、模型名称是否正确
+func (f *ModelFactory) TestConnection(ctx context.Context, config *models.AIConfig) error {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	switch config.Provider {
+	case models.AIProviderOpenAI:
+		return f.testOpenAIConnection(ctx, config)
+	case models.AIProviderGemini:
+		return f.testGeminiConnection(ctx, config)
+	case models.AIProviderVertexAI:
+		return f.testVertexAIConnection(ctx, config)
+	default:
+		return fmt.Errorf("不支持的 provider: %s", config.Provider)
+	}
+}
+
+// testOpenAIConnection 测试 OpenAI 兼容接口连通性
+func (f *ModelFactory) testOpenAIConnection(ctx context.Context, config *models.AIConfig) error {
+	baseURL := normalizeOpenAIBaseURL(config.BaseURL)
+	transport := proxy.GetManager().GetTransport()
+
+	// 构造最小的 chat completion 请求，max_tokens=1 减少消耗
+	body := map[string]interface{}{
+		"model":      config.ModelName,
+		"max_tokens": 1,
+		"messages":   []map[string]string{{"role": "user", "content": "hi"}},
+	}
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("请求构造失败: %w", err)
+	}
+
+	url := strings.TrimSuffix(baseURL, "/") + "/chat/completions"
+	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(jsonBody)))
+	if err != nil {
+		return fmt.Errorf("请求创建失败: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+config.APIKey)
+
+	client := &http.Client{Transport: transport}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("连接失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	}
+
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	return fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
+}
+
+// testGeminiConnection 测试 Gemini 连通性
+func (f *ModelFactory) testGeminiConnection(ctx context.Context, config *models.AIConfig) error {
+	llm, err := f.createGeminiModel(ctx, config)
+	if err != nil {
+		return fmt.Errorf("客户端创建失败: %w", err)
+	}
+
+	return f.testViaGenerate(ctx, llm)
+}
+
+// testVertexAIConnection 测试 Vertex AI 连通性
+func (f *ModelFactory) testVertexAIConnection(ctx context.Context, config *models.AIConfig) error {
+	llm, err := f.createVertexAIModel(ctx, config)
+	if err != nil {
+		return fmt.Errorf("客户端创建失败: %w", err)
+	}
+
+	return f.testViaGenerate(ctx, llm)
+}
+
+// testViaGenerate 通过 GenerateContent 发送最小请求测试连通性
+func (f *ModelFactory) testViaGenerate(ctx context.Context, llm model.LLM) error {
+	req := &model.LLMRequest{
+		Contents: []*genai.Content{
+			{Role: "user", Parts: []*genai.Part{{Text: "hi"}}},
+		},
+		Config: &genai.GenerateContentConfig{
+			MaxOutputTokens: 1,
+		},
+	}
+
+	for _, err := range llm.GenerateContent(ctx, req, false) {
+		if err != nil {
+			return fmt.Errorf("调用失败: %w", err)
+		}
+		return nil
+	}
+	return nil
 }

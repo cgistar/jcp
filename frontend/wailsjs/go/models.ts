@@ -749,7 +749,6 @@ export namespace models {
 	    id: string;
 	    name: string;
 	    description: string;
-	    icon: string;
 	    color: string;
 	    agents: StrategyAgent[];
 	    isBuiltin: boolean;
@@ -766,7 +765,6 @@ export namespace models {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.description = source["description"];
-	        this.icon = source["icon"];
 	        this.color = source["color"];
 	        this.agents = this.convertValues(source["agents"], StrategyAgent);
 	        this.isBuiltin = source["isBuiltin"];

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Cpu, ChevronLeft, Plug, Plus, Trash2, Wrench, Check, Loader2, Brain, RefreshCw, Download, RotateCcw, Globe, Layers, Sliders, Star, MessageSquare, Copy, Sparkles } from 'lucide-react';
-import { getConfig, updateConfig, getAvailableTools, ToolInfo } from '../services/configService';
+import { getConfig, updateConfig, getAvailableTools, ToolInfo, testAIConnection } from '../services/configService';
 import { getAgentConfigs } from '../services/strategyService';
 import { getMCPServers, MCPServerConfig, MCPServerStatus, testMCPConnection, getMCPServerTools, MCPToolInfo } from '../services/mcpService';
 import { checkForUpdate, doUpdate, restartApp, getCurrentVersion, onUpdateProgress, UpdateInfo, UpdateProgress } from '../services/updateService';
@@ -711,6 +711,21 @@ const ProviderEditView: React.FC<ProviderEditViewProps> = ({
   config, onBack, onChange, onDelete
 }) => {
   const isVertexAI = config.provider === 'vertexai';
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const result = await testAIConnection(config as any);
+      setTestResult(result === 'success' ? { success: true } : { success: false, error: result });
+    } catch (e: any) {
+      setTestResult({ success: false, error: e.message || '未知错误' });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -734,15 +749,44 @@ const ProviderEditView: React.FC<ProviderEditViewProps> = ({
             </p>
           </div>
         </div>
-        {!config.isDefault && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={onDelete}
-            className="p-2 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
+            onClick={handleTestConnection}
+            disabled={testing}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg disabled:opacity-50 transition-colors shrink-0"
           >
-            <Trash2 className="h-4 w-4" />
+            {testing ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                测试中...
+              </>
+            ) : (
+              '测试连接'
+            )}
           </button>
-        )}
+          {!config.isDefault && (
+            <button
+              onClick={onDelete}
+              className="p-2 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* 测试结果反馈 */}
+      {testResult && (
+        <div className={`text-xs px-3 py-2 rounded-lg ${
+          testResult.success
+            ? 'bg-accent/10 text-accent-2'
+            : 'bg-red-500/10 text-red-400'
+        }`}>
+          {testResult.success ? '连接成功' : (
+            <span className="line-clamp-2">{testResult.error || '连接失败'}</span>
+          )}
+        </div>
+      )}
 
       {/* 表单内容 */}
       <div className="space-y-4">
@@ -816,6 +860,7 @@ const ProviderEditView: React.FC<ProviderEditViewProps> = ({
           />
           <p className="text-xs text-slate-500 mt-1">建议值：2048-8192，最大取决于模型</p>
         </div>
+
       </div>
     </div>
   );
@@ -1744,7 +1789,12 @@ const StrategyListItem: React.FC<StrategyListItemProps> = ({
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-lg">{strategy.icon}</span>
+          <div
+            className="w-8 h-8 min-w-[2rem] min-h-[2rem] rounded-lg flex items-center justify-center text-white text-sm font-medium shrink-0"
+            style={{ backgroundColor: strategy.color }}
+          >
+            {strategy.name.charAt(0)}
+          </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="text-white text-sm font-medium">{strategy.name}</span>
@@ -1812,7 +1862,7 @@ const StrategyListView: React.FC<StrategyListViewProps> = ({
   <div className="space-y-6">
     {/* AI生成策略 */}
     <div>
-      <h3 className="text-white font-medium mb-3">✨ AI生成策略组</h3>
+      <h3 className="text-white font-medium mb-3">AI生成策略组</h3>
       {/* 生成用模型选择 */}
       <div className="mb-3">
         <label className="block text-sm text-slate-400 mb-1.5">生成用模型</label>
@@ -1847,7 +1897,7 @@ const StrategyListView: React.FC<StrategyListViewProps> = ({
 
     {/* 策略列表 */}
     <div>
-      <h3 className="text-white font-medium mb-3">📁 策略组列表</h3>
+      <h3 className="text-white font-medium mb-3">策略组列表</h3>
       <p className="text-slate-500 text-xs mb-3">点击策略可查看和编辑专家配置</p>
       <div className="space-y-2">
         {strategies.map(s => (
@@ -1889,7 +1939,12 @@ const StrategyAgentList: React.FC<StrategyAgentListProps> = ({
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <span className="text-2xl">{strategy.icon}</span>
+        <div
+          className="w-10 h-10 min-w-[2.5rem] min-h-[2.5rem] rounded-lg flex items-center justify-center text-white text-sm font-medium shrink-0"
+          style={{ backgroundColor: strategy.color }}
+        >
+          {strategy.name.charAt(0)}
+        </div>
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-white font-medium">{strategy.name}</h3>
@@ -1940,10 +1995,10 @@ const StrategyAgentListItem: React.FC<StrategyAgentListItemProps> = ({
     }`}
   >
     <div
-      className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0"
+      className="w-10 h-10 min-w-[2.5rem] min-h-[2.5rem] rounded-full flex items-center justify-center text-sm shrink-0"
       style={{ backgroundColor: agent.color + '20', color: agent.color }}
     >
-      {agent.avatar || agent.name.charAt(0)}
+      {agent.name.charAt(0)}
     </div>
     <div className="flex-1 min-w-0">
       <div className="text-white text-sm font-medium">{agent.name}</div>
@@ -2071,10 +2126,10 @@ const AgentEditHeader: React.FC<AgentEditHeaderProps> = ({
         <ChevronLeft className="h-5 w-5" />
       </button>
       <div
-        className="w-10 h-10 rounded-full flex items-center justify-center text-lg"
+        className="w-10 h-10 min-w-[2.5rem] min-h-[2.5rem] rounded-full flex items-center justify-center text-sm shrink-0"
         style={{ backgroundColor: agent.color + '20', color: agent.color }}
       >
-        {agent.avatar || agent.name.charAt(0)}
+        {agent.name.charAt(0)}
       </div>
       <div>
         <h3 className="text-white font-medium">{agent.name}</h3>

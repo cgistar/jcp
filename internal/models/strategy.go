@@ -19,7 +19,6 @@ type Strategy struct {
 	ID          string          `json:"id"`
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
-	Icon        string          `json:"icon"`
 	Color       string          `json:"color"`
 	Agents      []StrategyAgent `json:"agents"` // 策略专属的专家配置
 

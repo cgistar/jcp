@@ -166,6 +166,10 @@ export function SetActiveStrategy(arg1) {
   return window['go']['main']['App']['SetActiveStrategy'](arg1);
 }
 
+export function TestAIConnection(arg1) {
+  return window['go']['main']['App']['TestAIConnection'](arg1);
+}
+
 export function TestMCPConnection(arg1) {
   return window['go']['main']['App']['TestMCPConnection'](arg1);
 }

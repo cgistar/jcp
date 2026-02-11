@@ -173,6 +173,13 @@ func (a *App) startup(ctx context.Context) {
 	// 初始化代理配置
 	proxy.GetManager().SetConfig(&a.configService.GetConfig().Proxy)
 
+	// 初始化 MCP 管理器（绑定主 context，预创建 toolset）
+	if a.mcpManager != nil {
+		if err := a.mcpManager.Initialize(ctx); err != nil {
+			log.Warn("MCP 初始化失败: %v", err)
+		}
+	}
+
 	// 设置 Meeting 服务的 AI 配置解析器
 	if a.meetingService != nil {
 		a.meetingService.SetAIConfigResolver(a.getAIConfigByID)
@@ -915,6 +922,17 @@ func (a *App) GetMCPStatus() []mcp.ServerStatus {
 // TestMCPConnection 测试指定 MCP 服务器连接
 func (a *App) TestMCPConnection(serverID string) *mcp.ServerStatus {
 	return a.mcpManager.TestConnection(serverID)
+}
+
+// TestAIConnection 测试 AI 配置连通性
+func (a *App) TestAIConnection(config models.AIConfig) string {
+	factory := adk.NewModelFactory()
+	if err := factory.TestConnection(context.Background(), &config); err != nil {
+		log.Error("AI 连接测试失败 [%s]: %v", config.Name, err)
+		return err.Error()
+	}
+	log.Info("AI 连接测试成功 [%s]", config.Name)
+	return "success"
 }
 
 // GetMCPServerTools 获取指定 MCP 服务器的工具列表

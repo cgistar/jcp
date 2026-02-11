@@ -26,7 +26,6 @@ var builtinStrategies = []models.Strategy{
 		ID:          "default",
 		Name:        "均衡分析",
 		Description: "六大专家全面分析",
-		Icon:        "⚖️",
 		Color:       "#64748B",
 		Agents:      getDefaultStrategyAgents(),
 		IsBuiltin:   true,
@@ -471,7 +470,6 @@ func (s *StrategyService) getOutputTemplate() string {
   "strategy": {
     "name": "策略名称",
     "description": "一句话描述",
-    "icon": "emoji图标",
     "color": "#3B82F6",
     "agents": [
       {

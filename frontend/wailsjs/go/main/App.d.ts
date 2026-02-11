@@ -89,6 +89,8 @@ export function SendMeetingMessage(arg1:main.MeetingMessageRequest):Promise<Arra
 
 export function SetActiveStrategy(arg1:string):Promise<string>;
 
+export function TestAIConnection(arg1:models.AIConfig):Promise<string>;
+
 export function TestMCPConnection(arg1:string):Promise<mcp.ServerStatus>;
 
 export function UpdateAgentConfig(arg1:models.AgentConfig):Promise<string>;

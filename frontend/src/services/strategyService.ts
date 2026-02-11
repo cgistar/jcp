@@ -18,7 +18,6 @@ export interface Strategy {
   id: string;
   name: string;
   description: string;
-  icon: string;
   color: string;
   agents: StrategyAgent[];
   isBuiltin: boolean;
